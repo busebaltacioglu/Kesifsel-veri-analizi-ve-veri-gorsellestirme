@@ -1,0 +1,876 @@
+---
+title: "DSM 5006 Keşifsel Veri Analizi ve Veri Görselleştirme"
+subtitle: "Proje 1 ~ Hava ve Çevre Kirliliği"
+author: "Buse BALTACIOĞLU ~ 2019900540"
+date: "19 05 2021"
+output: 
+  pdf_document:
+   toc: true
+   number_sections: true
+   highlight: tango
+latex_engine: xelatex
+colortheme: seahorse
+fontsize: 11pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, out.width="500px"}
+library(png)
+library(grid)
+img <- readPNG("C:/Users/Casper/Desktop/cevre.png")
+ grid.raster(img)
+ 
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(readr)
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(ggcorrplot)
+library(funModeling)
+library(imputeTS)
+library(mice)
+library(VIM)
+library(forecast)
+library(tseries)
+library(fpp2)
+library(lmtest)
+```
+
+# Atık Problemi
+
+Çevre kirliliği problemi çağımızın en önemli sorunlarından biri olarak karşımıza çıkmaktadır. Dünya genelinde aşırı nüfus ve sanayileşmenin etkisi nedeniyle büyük atık problemleri yaşanmaktadır.
+ 
+Atıkların çevreye verdikleri zararlar; hava kirliliği, küresel ısınma, yer altı suyu kirliliği, bitki örtüsünün zarar görmesi, yangın ve patlamalar olarak karşımıza çıkmaktadır. Değerlendirilebilen atıkların çeşitli fiziksel ve kimyasal işlemler aracılığıyla ikincil maddeye dönüştürülerek tekrar üretime dahil edilmesi doğanın zarar görmemesi açısından gereklidir.
+ 
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+atik <- read_excel("C:/Users/Casper/Desktop/DSM 5006 Kesifsel Veri Analizi ve Veri Görsellestirme/Ödev_1/atik.xlsx", 
+                   col_types = c("text", "numeric", "numeric", "text"))
+```
+
+> Atık verisinin kayıp değer kontrolü ve tanımlayıcı istatistikleri;
+ 
+```{r}
+sapply(atik, function(x) sum(is.na(x)))
+```
+
+```{r}
+head(atik)
+```
+
+```{r}
+summary(atik)
+```
+
+```{r}
+apply(atik[,2:3], 2, sd)
+```
+
+- Tehlikeli atık miktarı 95 ton ile 206428 ton arasında 20882 ton ortalama ve 42556 ton standart sapmaya sahiptir.
+
+- Tehlikesiz atık miktarı 1 ton ile 4430552 ton arasında 299723 ton ortalama ve 736128 ton standart sapmaya sahiptir.
+
+
+```{r}
+boxplot(atik[,2:3],
+        main = "Atık türlerine göre atık miktarları",
+        col = rainbow(n=2),
+        ylab = "Atık türleri",
+        xlab = "Atık miktarları",
+        ylim = c(0,3E+5),
+        horizontal = T)
+```
+
+```{r}
+ggplot(atik, aes(x=tehlikeli_atik, y=tehlikesiz_atik, color = bolgeler))+
+  geom_point(aes(color = bolgeler))+
+  labs(title = "Tehlikeli Atık - Tehlikesiz Atık", x = "Tehlikeli atık", y="Tehlikesiz atık")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))+
+  scale_x_log10()+scale_y_log10()
+```
+
+- Tehlikeli atık ile tehlikesiz atık arasında doğrusal pozitif yönlü bir ilişki olduğunu söyleyebiliriz.
+
+## Tehlikeli Atık
+
+ Atık Yönetim Uygulaması/Atık Beyan Sistemi (TABS)’da yer alan tehlikeli atık verisi, atık üreticilerinin gerçekleştirdikleri beyanlardan oluşmakta olup, 2019 yılında atık üreticisinin tesiste oluşan ve geri kazanım/bertaraf amacıyla atık işleme tesisine gönderilen tehlikeli atık verisini içermektedir.
+ 
+ Teknolojik gelişmelere bağlı olarak ortaya çıkan, çevre ve insan sağlığını tehdit eden, endüstriyel nitelikli atıklardır. Endüstriyel atıkların tehlikeli ve zararlı özellik taşıyanları, tehlikeli atık olarak adlandırılır. Rafineriler, enerji santralleri, oyuncak endüstrisi, ilaç fabrikaları bunlardan bazılarıdır.
+ 
+ 2019 yılında beyan edilen tehlikeli atığın %85,74’ü geri kazanılmak üzere atık işleme tesislerine gönderilirken %12,01’i bertaraf edilmek üzere sterilizasyon, düzenli depolama ve yakma tesislerine gönderilmiştir.  Bununla birlikte %2,09’u stok, % 0,15’i ise ihracat olarak kaydedilmiştir.
+
+```{r}
+ax1<-atik %>% filter(tehlikeli_atik>=mean(tehlikeli_atik))
+```
+
+```{r}
+ggplot(ax1, aes(y=sehir, x=tehlikeli_atik))+
+  geom_bar(aes(fill=bolgeler, y=reorder(sehir, tehlikeli_atik, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Tehlikeli Atık Ortalamasını Aşan Şehirler",
+       x ="Tehlikeli atık (ton)", y = "Şehirler", fill = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))+
+  scale_fill_discrete(name = "Bölgeler", 
+                      labels = c("Akdeniz","Doğu","Ege","İç Anadolu", "Marmara"))
+
+```
+
+- Sanayileşmeninde etkisiyle tehlikeli atık miktarının en fazla olduğu şehir Kocaeli'dir.
+
+## Tehlikesiz Atık
+
+ TABS’da yer alan tehlikesiz atık verisi, atık üreticilerinin gerçekleştirdikleri beyanlardan oluşmakta olup, beyan yılında atık üreticisinin tesiste oluşan ve geri kazanım/bertaraf amacıyla atık işleme tesisine gönderilen tehlikesiz atık verisini içermektedir.
+ 
+ 2019 yılında geri kazanım amacıyla atık işleme tesislerine gönderilen atık miktarı 11.196.504 ton, bertaraf edilmek üzere atık işleme tesisine gönderilen atık miktarı ise 7.777.422 ton olarak gerçekleşmiştir. Yılsonu itibariyle tesiste stok olarak tutulan tehlikesiz atık miktarı 4.567.402 ton, ihraç edilen tehlikesiz atık miktarı ise 136.985 ton olarak gerçekleşmiştir.
+ 
+ 2019 yılında beyan edilen tehlikesiz atığın %47.29’u geri kazanılmak üzere atık işleme tesislerine gönderilirken %32.85’i bertaraf edilmek üzere düzenli depolama ve yakma tesislerine gönderilmiştir.
+ 
+```{r}
+ax2<-atik %>% filter(tehlikesiz_atik>=mean(tehlikesiz_atik))
+```
+
+```{r}
+ggplot(ax2, aes(x=tehlikesiz_atik, y=sehir))+
+  geom_bar(aes(fill=bolgeler, y=reorder(sehir, tehlikesiz_atik, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Tehlikesiz Atık Ortalamasını Aşan Şehirler",
+       x ="Tehlikesiz atık (ton)", y = "Şehirler", fill = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))+
+   scale_fill_discrete(name = "Bölgeler", 
+                      labels = c("Akdeniz","Ege","İç Anadolu","Karadeniz", "Marmara"))
+```
+
+- Tehlikesiz atık miktarının en fazla olduğu şehir Ankara'dır.
+
+## Toplam Atık Miktarı
+
+```{r}
+ax3<- atik %>% 
+  mutate(top_atik=tehlikeli_atik+tehlikesiz_atik)
+
+tao <- ax3 %>% filter(top_atik>=mean(top_atik))
+```
+
+```{r}
+ggplot(tao, aes(y=sehir, x=top_atik))+
+  geom_bar(aes(fill=bolgeler, y=reorder(sehir, top_atik, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Toplam Atık Ortalamasını Aşan Şehirler",
+       x ="Toplam atık (ton)", y = "Şehirler", fill = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))+
+   scale_fill_discrete(name = "Bölgeler", 
+                      labels = c("Akdeniz","Ege","İç Anadolu","Karadeniz", "Marmara"))
+```
+
+- Toplam atık miktarı en fazla olan şehir Ankara'dır.
+
+
+
+```{r}
+taob<-ax3 %>% group_by(bolgeler) %>% 
+  summarise(top=sum(top_atik))
+```
+
+```{r}
+ggplot(taob, aes(y=bolgeler, x=top))+
+  geom_bar(aes(fill=bolgeler,y=reorder(bolgeler, top, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Bölgelere Göre Toplam Atık",
+       x ="Toplam atık (ton)", y = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+- 2019 yılında toplam atık miktarı en fazla Marmara bölgesindedir.
+
+
+
+# Toprak Kaybı Problemi (Erozyon)
+
+ Her yıl 100 bin kilometre karelik bir alanı kaplayacak 75 milyar ton toprak erozyona uğruyor. Dünyadaki ekilebilir toprakların yüzde 80’i kalitesini yitirmiş durumda. Son 40 yılda ise toprak erozyonu yüzünden mahsullerin üçte biri kayba uğradı.
+ 
+ Dünya nüfusunun yedi milyarı aştığı, yiyeceklerden aldığımız kalorinin yüzde 95’ini topraktan edindiğimiz ve gelecek 50 yılda, son 10 bin yılda ürettiğimizin toplamından fazla mahsule ihtiyacımız olacak bir dönemde bunların yaşanması alarm verici.
+ 
+ İklim değişikliğinin toprak üzerinde önemli etkileri vardır ve arazi kullanımı ile topraktaki değişimler de iklim değişikliğini hızlandırabilir veya yavaşlatabilir. Sağlıklı topraklar ile sürdürülebilir bir arazi ve toprak yönetimi olmadan iklim krizleri engelleyemez, gıda üretemez ve değişen bir iklime uyum sağlayamayız. Önemli ekosistemleri korumak ve canlandırmak ve doğanın atmosferden karbon yakalamasına olanak sağlamak yanıt olabilir.
+ 
+```{r message=FALSE, warning=FALSE}
+toprak <- read_excel("C:/Users/Casper/Desktop/DSM 5006 Kesifsel Veri Analizi ve Veri Görsellestirme/Ödev_1/toprak.xlsx")
+```
+
+> Toprak kaybı verisinin tanımlayıcı istatistikleri;
+ 
+```{r}
+head(toprak)
+```
+
+- Çok hafif: Yılda hektar başına 0-1 ton arası
+
+- Hafif: Yılda hektar başına 1-5 ton arası
+
+- Orta: Yılda hektar başına 5-10 ton arası
+
+- Şiddetli: Yılda hektar başına 10-20 ton arası
+
+- Çok şiddetli: Yılda hektar başına 20 tondan daha fazla
+
+```{r}
+summary(toprak)
+```
+
+```{r}
+apply(toprak[,2:6], 2, sd)
+```
+
+- Çok hafif toprak kaybı miktarı 22.86 ile 82.96 arasında 60.03 ortalama ve 13.4 standart sapmaya sahiptir.
+
+- Hafif toprak kaybı miktarı 5.46 ile 36.61 arasında 18.22 ortalama ve 8.36 standart sapmaya sahiptir.
+
+- Orta toprak kaybı miktarı 3.25 ile 16.89 arasında 8.12 ortalama ve 3.11 standart sapmaya sahiptir.
+
+- Şiddetli toprak kaybı miktarı 1.45 ile 15.70 arasında 6.35 ortalama ve 2.57 standart sapmaya sahiptir.
+
+- Çok şiddetli toprak kaybı miktarı 0.41 ile 27.17 arasında 7.29 ortalama ve 4.85 standart sapmaya sahiptir.
+
+```{r}
+boxplot(toprak[,2:6],
+        main = "Şiddetlerine göre toprak kaybı miktarlarının kutu grafiği",
+        col = rainbow(n=5),
+        ylab = "Şiddetler",
+        xlab = "Toprak kaybı miktarı",
+        horizontal = T)
+```
+
+```{r}
+corr<-round(cor(toprak[,2:6]),1)
+ggcorrplot(corr, hc.order = TRUE,
+           type = "lower", outline.color = "#828282",
+           ggtheme = ggplot2::theme_minimal(),
+           lab = TRUE,
+           title = ("Toprak Kaybı Şiddetlerinin Korelasyon Matrisi"))
+```
+
+```{r}
+ggplot(toprak, aes(x=`Very Low`, y=Moderate, color = bolgeler))+
+  geom_point(aes(color = bolgeler))+
+  labs(title = "Çok hafif şiddetli - Normal şiddetli", x = "Çok hafif şiddetli", y="Normal şiddetli")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))
+```
+
+```{r}
+tx1<- toprak %>% 
+  mutate(top_toprak=Low+`Very Low`+Moderate+Severe+`Very Severe`)
+
+tx2 <- tx1 %>% group_by(bolgeler) %>% 
+  summarise(top_bol=sum(top_toprak))
+```
+
+- Her bir şehrin toplam toprak kaybı şiddetleri yılda hektar başına 100 ton'dur.
+
+```{r}
+ggplot(tx2, aes(y=bolgeler, x=top_bol))+
+  geom_bar(aes(fill=bolgeler, y=reorder(bolgeler, top_bol, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Bölgelere Göre Toplam Toprak Kaybı Miktarı",
+       x ="Toprak kaybı miktarı", y = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+- En çok toprak kaybı karadeniz ve doğu bölgelerinde gerçekleşmektedir.
+
+```{r}
+tx3<- toprak %>% 
+  mutate(top_toprak=Moderate+Severe+`Very Severe`)
+
+tx4<-tx3 %>% filter(top_toprak>=mean(top_toprak))
+```
+
+```{r}
+ggplot(tx4, aes(y=Sehir, x=top_toprak))+
+  geom_bar(aes(fill=bolgeler, y=reorder(Sehir, top_toprak, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Yılda Hetar Başına 20 tondan Fazla Toprak Kaybı Yaşayan En Riskli Şehirler",
+       x ="Toprak kaybı miktarı", y = "Şehirler", fill = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))+
+   scale_fill_discrete(name = "Bölgeler", 
+                      labels = c("Doğu","Ege","Güney Doğu","İç Anadolu","Karadeniz","Marmara"))
+```
+
+- Yılda hektar başına 50 ton'dan fazla normalin üzerinde toprak kaybı yaşayan şehir Bayburt'tur.
+
+- Ağaç ve funda dikme yoluyla bu durum önlenebilir. Örneğin Batı Afrika’daki ağaç dikme programları sayesinde toprağın verimliliği önemli oranda arttı.
+
+
+# Hava Kirliliği Problemi
+
+ Kirli havanın içerisinde; insan sağlığına ve diğer canlılara zarar verecek seviyede istenmeyen maddeler bulunur. Bazı kirleticiler, kaynaktan atıldığında doğrudan havayı kirletir, bazıları da atmosferde iki kirleticinin tepkimeye girmesiyle yeni bir kirletici oluşturabilir. Sıcaklık ve nem gibi (meteorolojik) koşullar kirleticilerin dönüşmesinde etkili olur.
+ 
+ Hava kirliliği; çöl tozu ve yanardağ patlamaları gibi doğal kaynaklardan veya insan faaliyetlerinden kaynaklanır. İnsan faaliyetleri sonucunda ortaya çıkan hava kirliliği gerekli önlemlerin alınması ile engellenebilir. 
+ 
+ İnsan faaliyetlerine bağlı hava kirliliği kaynaklarının başlıcaları;
+ 
+a) Sanayi ve santrallerde enerji üretimi için kullanılan fosil yakıtlar,
+
+b) Ulaşım için kullanılan fosil yakıtlar,
+
+c) Madencilik tesisleri ve endüstriyel tesisler,
+
+d) Evlerde ısınma ve yemek yapma amaçlı kömür ve odun yakılması,
+
+e) İnşaat faaliyetleri ve yollardan kaynaklanan tozlar,
+
+f) Atık ve anızların yakılması,
+
+h) Bazı endüstriyel tarım faaliyetleridir.
+
+ Özellikle sanayiden kaynaklanan kirleticiler; iklim değişikliği ve asit yağmurlarının yanı sıra ciddi sağlık sorunlarına da neden olurlar. Bacalardan çıkan ve saç telinden daha ince olduğundan göremediğimiz partikül maddeler kana karışarak sağlık sorunlarına neden olur.
+
+```{r message=FALSE, warning=FALSE}
+hava_kirliligi <- read_csv("C:/Users/Casper/Desktop/DSM 5006 Kesifsel Veri Analizi ve Veri Görsellestirme/Ödev_1/hava_kalitesi.csv", 
+                          col_types = cols(X1 = col_skip(), PM10 = col_number(), 
+                                           SO2 = col_number(), CO = col_number(), 
+                                           NO2 = col_number(), O3 = col_number()))
+
+```
+
+> Hava kirliliği verisinin kayıp değer kontrolü ve tanımlayıcı istatistikleri;
+
+```{r}
+sapply(hava_kirliligi, function(x) sum(is.na(x)))
+```
+
+```{r message=FALSE, warning=FALSE}
+aggr(hava_kirliligi, col=c("dodgerblue", "orange"),
+     numbers=TRUE, sortVars=TRUE, labels=names(hava_kirliligi),
+     cex.axis=0.7, gap=3,
+     ylab=c("Kayıp değer histogramı", "örüntü"))
+```
+
+- Yukarıdaki grafik hava kirliliğine ait değişkenlerin kayıp değer oranlarını ve örüntüsünü vermektedir.
+
+- Kayıp değer ataması için tahminsel ortalama eşleştirmesi yöntemi ve rassal ormanlar yöntemi denenmiş. Orijinal veri setinin değişkenler arasındaki ilişkisini rassal ormanlar yöntemi daha iyi açıklamıştır. Bu sebepten kayıp değerler rassal ormanlar yönemiyle tamamlanmıştır.
+
+```{r include=FALSE}
+set.seed(2882)
+dfrf<-mice(hava_kirliligi, m=5, meth="rf", maxit = 10)
+```
+
+```{r include=FALSE}
+set.seed(2882)
+df_rf<-complete(dfrf)
+```
+
+```{r}
+corrf<-round(cor(df_rf[,-1]),1)
+ggcorrplot(corrf, hc.order = TRUE,
+           type = "lower", outline.color = "#828282",
+           ggtheme = ggplot2::theme_minimal(),
+           lab = TRUE,
+           title = ("Hava Kirliliğine ait Değişkenlerin Korelasyon Matrisi"))
+```
+
+```{r}
+boxplot(df_rf[,-1],
+        main = "Hava Kirliliğine ait Değişkenlerin Kutu Grafiği",
+        col = rainbow(n=5),
+        ylab = "Maddeler",
+        xlab = "Miktarları",
+        horizontal = T)
+```
+
+## Partikül madde 
+
+- Ana kaynağı; 
+
+ Sanayi, taşıt emisyonları, fosil yakıt yakılması, tarım ve ikincil kimyasal reaksiyonlar
+
+- Sağlık etkisi;
+
+ Kanser, kalp problemleri, solunum yolu hastalıkları, bebek ölüm oranlarında artış
+
+- Dünya sağlık örgütü partikül madde kılavuz sınır değeri;
+
+ Yıllık ortalama sınır değer 20 mg/m^3, 24 saatlik ortalama sınır değer 50 mg/m^3
+
+```{r}
+df_rf %>% summarise(
+  PM10_min=min(PM10),
+  PM10_ort=mean(PM10),
+  PM10_max=max(PM10),
+  PM10_sd=sd(PM10)
+)
+```
+
+- 2020 yılına ait bu değerlerden de görüleceği üzere yıllık PM10 ortalaması DSÖ kriterine göre yaklaşık 2.5 kat fazladır.
+
+```{r}
+sum(df_rf$PM10<=20)
+```
+
+- Bu kriterin altında kalan 2 şehrimiz bulunmaktadır.
+
+```{r}
+hx1<- df_rf %>% filter(PM10<=20)
+```
+
+```{r}
+ggplot(hx1, aes(x=Şehir, y=PM10))+
+  geom_bar(aes(fill=Şehir),stat = "identity")+
+  labs(title = "Partikül Madde Ortalamasını 20 mg/m^3 Altında Kalan Şehirler",
+       y ="PM10 miktarı", x = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+
+```
+
+- Bitlis ve Hakkari partikül madde açısından en risksiz iki şehirdir.
+
+```{r}
+hx12<- df_rf %>% filter(PM10>=(mean(PM10)))
+```
+
+```{r}
+ggplot(hx12, aes(y=Şehir, x=PM10))+
+  geom_bar(aes(fill=Şehir, y=reorder(Şehir, PM10, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Atmosferik Partikül Madde Ortalamasını Aşan Şehirler",
+       x ="PM10 miktarı", y = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+
+```
+
+- Atmosferik partikül madde miktarının fazla olduğu şehir Muş'tur.
+
+- Partiküler Madde (PM10) ve çapı 10 mikrometreden küçük diğer tanecikler akciğerlere ulaşarak iltihaplanmaya ya da insanları çok olumsuz etkileyecek kalp ve akciğer hastalıklarına neden olabilirler.
+
+## Kükürtdioksit
+
+- Ana kaynağı; 
+
+ Fosil yakıt yakılması, taşıt emisyonları
+ 
+- Sağlık etkisi;
+
+ Solunum yolu hastalıkları
+ 
+ 24 saatin üzerinde maruz kalımda duyarlı hastalarda semptom alevlenmeleri görülmektedir. Yıllık ortalama değer 50 mg/m3 günlük değer 125 mg/m3’ü geçmeyen düşük düzeylerdeki maruz kalımda bile kalp ve solunum sistemi hastalıklarına bağlı ölümlerde ve tüm solunum yolu hastalıklarına bağlı hastane başvurularında artışlar gözlenmiştir.
+
+```{r}
+df_rf %>% summarise(
+  SO2_min=min(SO2),
+  SO2_ort=mean(SO2),
+  SO2_max=max(SO2),
+  SO2_sd=sd(SO2)
+)
+```
+
+```{r}
+sum(df_rf$SO2<=50)
+```
+
+- 80 şehrimiz kükürtdioksit kriteri altında kalmaktadır.
+
+```{r}
+hx2<-df_rf %>% filter(SO2>=50)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(hx2, aes(x=Şehir, y=SO2))+
+  geom_bar(aes(fill=Şehir, y=reorder(SO2, Şehir)),
+           stat = "identity")+
+  labs(title = "Kükürtdioksit Kriterini Aşan Şehirler",
+       y ="SO2 miktarı", x = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+- Kükürt dioksit miktarını aşan şehir sadece Hakkari'dir.
+
+- Kükürtdioksit (SO2) insanlar için doğrudan zehirleyicidir; temel olarak solunum fonksiyonlarını etkiler. Sülfürik asit ve sülfat formuna dönüşmesi durumunda insan sağlığını dolaylı olarak tehdit edebilir.
+
+## Karbonmonoksit
+
+- Ana kaynağı;
+
+ Eksik yanma ürünü, taşıt emisyonları
+
+- Sağlık etkisi;
+
+ Kandaki hemoglobin ile birleşerek oksijen taşınma kapasitesinde azalma, ölüm
+ 
+- DSÖ, AB ve Ulusal limit değeri (8 saatlik ortalama) 10mg/m3'tür.
+
+```{r}
+df_rf %>% summarise(
+  CO_min=min(CO),
+  CO_ort=mean(CO),
+  CO_max=max(CO),
+  CO_sd=sd(CO)
+)
+```
+
+```{r}
+hx3<-df_rf %>% filter(CO>=mean(CO))
+```
+
+```{r}
+ggplot(hx3, aes(y=Şehir, x=CO))+
+  geom_bar(aes(fill=Şehir, y=reorder(Şehir, CO, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Karbonmonoksit Ortalamasını Aşan Şehirler",
+       x ="CO miktarı", y = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+- Karbon monoksit miktarının en fazla olduğu şehir Sivas'tır.
+
+- Havadaki CO oran arttıkça ortalama ölüm süresinden daha kısa sürede ölümler oluşabilir. 
+
+## Azotdioksit
+
+- Ana kaynağı;
+
+ Taşıt emisyonları, yüksek sıcaklıkta yakma prosesleri
+
+- Sağlık etkisi;
+
+ Göz ve solunum yolu hastalıkları
+ 
+- AB üye ülkeleri ve Türkiye'de azotdioksit sınır değeri 30 mg/m3'tür.
+
+```{r}
+df_rf %>% summarise(
+  NO2_min=min(NO2),
+  NO2_ort=mean(NO2),
+  NO2_max=max(NO2),
+  NO2_sd=sd(NO2)
+)
+```
+
+```{r}
+sum(df_rf$NO2<=30)
+```
+
+- 38 şehrimiz azotdioksit sınır değeri altında kalmıştır.
+
+```{r}
+hx4<- df_rf %>% filter(NO2<=30)
+```
+
+```{r}
+ggplot(hx4, aes(y=Şehir, x=NO2))+
+  geom_bar(aes(fill=Şehir, y=reorder(Şehir, NO2, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Azotdioksit Değerinin 30 mg/m3 Altında Kalan Şehirler",
+       x ="NO2 miktarı", y = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+- Azotdioksit miktarının en az olduğu şehir Bilecik'tir.
+
+```{r}
+hx41<-df_rf %>% filter(NO2>=30)
+```
+
+```{r}
+ggplot(hx41, aes(y=Şehir, x=NO2))+
+  geom_bar(aes(fill=Şehir, y=reorder(Şehir, NO2, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Azotdioksit Kriterini Aşan Şehirler",
+       x ="NO2 miktarı", y = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+- Azotdioksit miktarının en fazla olduğu şehir Kahramanmaraş'tır.
+
+- Asit yağmurlarının, ozonun ve dumanlı sis kirliliğinin oluşumu üzerinde azot oksit önemli rol oynamaktadır. Azot oksitler; bir tür sera gazı olan ozon oluşumuna neden olmaktadır. Bu nedenle “dolaylı sera gazları” ve “ozon öncülleri” olarak da anılmaktadırlar.
+
+## Ozon
+
+- Ana kaynağı; 
+
+ Trafikten kaynaklanan azotoksitler ve uçucu organik bileşiklerin güneş ışığıyla değişimi
+ 
+- Sağlık etkisi;
+
+ Solunum sistemi problemleri, göz ve burunda iritasyon, astım, vücut direncinde azalma
+ 
+- DSÖ, AB ve Ulusal limit değeri (8 saatlik ortalama) 120mg/m3'tür.
+
+```{r}
+df_rf %>% summarise(
+  O3_min=min(O3),
+  O3_ort=mean(O3),
+  O3_max=max(O3),
+  O3_sd=sd(O3)
+)
+```
+
+```{r}
+hx5<-df_rf %>% filter(O3>=mean(O3))
+```
+
+```{r}
+ggplot(hx5, aes(y=Şehir, x=O3))+
+  geom_bar(aes(fill=Şehir, y=reorder(Şehir, O3, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Ozon gazı Ortalamasını Aşan Şehirler",
+       x ="O3 miktarı", y = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+- Ozon gazı miktarının en fazla olduğu şehir Çorum'dur.
+
+
+# Ulusal Çapta PM10 Seviyesi En Düşük ve SO2 En Yüksek Şehrimiz Hakkari
+
+```{r message=FALSE, warning=FALSE}
+hakkari <- read_excel("C:/Users/Casper/Desktop/DSM 5006 Kesifsel Veri Analizi ve Veri Görsellestirme/Ödev_1/hakkari.xlsx", 
+                      col_types = c("date", "numeric", "numeric"))
+```
+
+> Hakkari şehrine ait veri setinin kayıp değer kontrolü ve tanımlayıcı istatistikleri
+
+```{r}
+sapply(hakkari, function(x) sum(is.na(x)))
+```
+
+ Kayıp değerler rassal orman yöntemiyle iyileştirilmiştir.
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+set.seed(2882)
+dfhk<-mice(hakkari, m=5, meth="rf", maxit = 10)
+```
+
+```{r}
+set.seed(2882)
+df_hk<-complete(dfhk)
+```
+
+```{r}
+head(df_hk)
+```
+
+```{r}
+summary(df_hk)
+```
+
+```{r}
+apply(df_hk[,-1], 2, sd)
+```
+
+- PM10 miktarı 3 ile 249 arasında 30 ortalama ve 32 standart sapmaya sahiptir.
+
+- SO2 miktarı 1.71 ile 1128 arasında 87 ortalama ve 140 standart sapmaya sahiptir.  
+
+```{r}
+boxplot(df_hk[,-1],
+        main = "Hakkari'ye ait Değişkenlerin Kutu Grafiği",
+        col = rainbow(n=2),
+        ylab = "Maddeler",
+        xlab = "Miktarları",
+        horizontal = T)
+```
+
+```{r}
+ggplot(df_hk, aes(x=PM10, y=SO2))+
+  geom_point(color="#00AFBB")+
+  geom_density_2d(color="#E89521")+
+  scale_x_log10()+
+  scale_y_log10()
+```
+
+- PM10 ve SO2 arasında doğrusal bir ilişki bulunmamaktadır.
+
+```{r}
+df_fts<-ts(data = df_hk[,-1],
+       start = c(2017, 01, 01),
+       end = c(2021, 05, 13),
+       frequency = 12)
+```
+
+```{r}
+autoplot(df_fts)+
+  ggtitle("PM10 ile SO2 Aylara Göre Değişimi")+
+  xlab("Aylar")+
+  ylab("PM10 ~ SO2")+
+  geom_line()+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))
+```
+
+## Hakkari İçin PM10 Zaman Serisi Analizi
+
+```{r}
+ggplot(df_hk, aes(x=Tarih, y=PM10))+
+  geom_line(color="#E46785")+
+  scale_x_datetime()+
+  theme(panel.background = element_rect(fill = "#BFD5E3", colour = "#6D9EC1",
+                                        size = 2, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                        colour = "white"),
+        panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
+                                        colour = "white"))+
+  labs(title = "Partikül Maddenin Zamana Göre Değişimi",
+       x ="Tarih", y = "PM10")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"))
+```
+
+- Zamanla Hakkari'deki PM10 seviyesinin azaldığı görülmektedir.
+
+```{r}
+df_pts<-ts(data = df_hk[,2],
+       start = c(2017, 01, 01),
+       end = c(2021, 05, 13),
+       frequency = 12)
+```
+
+```{r}
+autoplot(df_pts)+
+  ggtitle("PM10 zaman serisi grafiği")+
+  xlab("Aylar")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))
+```
+
+Hakkari şehrine ait PM10 değişkeninin zaman serisi analizi için;
+
+- Bileşenleri incenmiş
+
+- Durağanlığı ve çevrilebilirliği kontrol edilmiş
+
+- Aday modeller belirlenmiş
+
+- ARIMA(2,1,3) modeline karar verilmiş
+
+- Tanısal kontrolü yapılmıştır
+
+```{r}
+arima213<-arima(df_pts, order = c(2,1,3))
+```
+
+```{r}
+plot(forecast(arima213, h=12))
+```
+
+- Haziran 2021 için öngörülen ortalama PM10 seviyesi %80 güvenle yaklaşık 2.11 ile 75.02 arasında 38.57'dir. %95 güvenle -17.18 ile 94.31 arasında 38.57'dir.
+
+# Sonuç
+
+ Hava kirliliği ile iklim değişikliği arasında da güçlü bir bağlantı vardır. Siyah karbon, fosil yakıtlar, odun ve diğer yakıtların eksik yanmasıyla oluşan partikül maddenin güçlü bir iklim ısınması bileşenidir. Tam yanma, yakıttaki tüm karbonu karbondioksite dönüştürür, ancak yanma asla tamamlanmaz ve süreçte karbonmonoksit, uçucu organik bileşikler, organik karbon ve siyah karbon partikülleri oluşur. Eksik yanmadan kaynaklanan karmaşık partikül madde karışımına genellikle kurum denir.
+ 
+ Siyah karbon, atmosferde salındıktan sadece günler ve haftalar sonra kısa ömürlü bir iklim kirleticisidir. Bu kısa sürede siyah karbonun iklim, buzul bölgeleri, tarım ve insan sağlığı üzerinde doğrudan ve dolaylı etkileri olabilir. Birçok çalışma, siyah karbon emisyonlarını önlemek için alınan önlemler sayesinde; iklimin kısa süreli ısınmasının azaltılabileceğini, mahsul veriminin artarak ve erken ölümlerin önlenebileceğini göstermiştir.
+
+ Türkiye’de hava kirliliği Dünya Sağlık Örgütü kılavuz değerine indirilseydi; 2019 yılında tüm ölümlerin %7,9’u (31.476 ölüm) ve 2018 yılındaki tüm ölümlerin %12.13’ü (45.398 ölüm) önlenebilirdi.
+
+ 2017 yılından beri her yıl hava kirliliği trafik kazalarının 6 katından fazla ölüme sebep oluyor. 
+ 
+ 2019 yılında hava kirliliğine atfedilen ölüm sayısının en fazla olduğu üç il sırasıyla İstanbul, İzmir ve Manisa olmuştur. 
+
+Hava kirliliğini önlemek için alınabilecek tedbirler  
+
+- Sanayi tesislerinin baca gazı sınır değerlerine uymaları sağlanmalı, 
+
+- Isınmada yüksek kalorili kömürler kullanılmalı, her yıl bacalar ve soba boruları temizlenmeli ve binalarda ısı yalıtımına önem verilmeli,
+
+- Kullanılan sobalar ve kalorifer kazanları kriterlere uygun olmalı,
+
+- Doğalgaz kullanımı yaygınlaştırılarak özendirilmeli, 
+
+- Kalorifer ve doğalgaz kazanlarının periyodik olarak bakımı yapılmalı, 
+
+- Yeni yerleşim yerlerinde bölgesel ısıtma sistemleri kullanılmalı, 
+
+- Kent içi ulaşımda uygun meyilli alanlarda bisiklet yolları, park yerleri, kiralama sistemi oluşturulmalı, kamuoyu bilgilendirmesi de sağlayarak bisiklet kullanımı yaygınlaştırılmalı, 
+
+- Isınma ve geri kazanım için atık yakmanın önüne geçilmesi amacıyla, atıklar geri kazanılarak değerlendirilmeli veya uygun atık yakma tesislerinde yakılarak bertaraf edilmeli, 
+
+- Yerleşim alanları dışında ve hakim rüzgar yönü dikkate alınarak sanayi tesislerinin yer seçimi yapılmalı, imar planlarında bu alanların çevresinde yapılaşmalar önlenmeli, 
+
+- Euro 4 ve üzeri standartları sağlayan, emisyonları düşük motorlu taşıtlar tercih edilmeli ve desteklenmeli,
+
+- Toplu taşıma araçları yaygınlaştırılmalı, 
+
+- Araçların egzoz emisyon ölçümleri periyodik olarak yapılmalı.
+
+
+# Kaynak
+
+Kassambara, A. (2017). Guide to Create Beautiful Graphics in R . STHDA.
+
+https://webdosya.csb.gov.tr/db/ced/icerikler/2019_yili_tehlikeli_atik_istatistik_bulteni-yayinlanacak-dokuman-20210225111113.doc
+
+https://webdosya.csb.gov.tr/db/ced/icerikler/2019_yili_tehlikesiz_atik_istatistikleri_bulteni-20210415134425.pdf
+
+https://www.temizhavahakki.com/wp-content/uploads/2019/08/Hava-Kirlilig%CC%86i-ve-Sag%CC%86l%C4%B1k-Etkileri-Kara-Rapor-2019.pdf
+
+https://www.temizhavahakki.com/wp-content/uploads/2020/09/Kara-Rapor-2020-Son27082020.pdf
+
+https://www.who.int/en/news-room/fact-sheets/detail/ambient-(outdoor)-air-quality-and-health
+
+https://www.cmo.org.tr/resimler/ekler/21fa9c274e6d844_ek.pdf
+
+http://www.cevresehirkutuphanesi.com/assets/files/slider_pdf/7oOlfFElT7pu.pdf
+
+https://sbu.saglik.gov.tr/Ekutuphane/kitaplar/css8.pdf
+
+https://core.ac.uk/download/pdf/267827296.pdf

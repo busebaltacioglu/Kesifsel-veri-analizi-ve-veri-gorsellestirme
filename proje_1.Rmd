@@ -1,0 +1,1240 @@
+---
+title: "Hava ve Çevre"
+author: "Buse Baltacıoğlu"
+date: "16 05 2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(ggcorrplot)
+```
+
+# Atık 
+```{r}
+atik <- read_excel("C:/Users/Casper/Desktop/DSM 5006 Kesifsel Veri Analizi ve Veri Görsellestirme/Ödev_1/atik.xlsx", 
+                   col_types = c("text", "numeric", "numeric", "text"))
+```
+
+```{r}
+sapply(atik, function(x) sum(is.na(x)))
+```
+
+```{r}
+head(atik)
+```
+
+```{r}
+summary(atik)
+```
+
+```{r}
+apply(atik[,2:4], 2, sd)
+```
+
+```{r}
+boxplot(atik[,2:4],
+        main = "Atık türlerine göre atık miktarları",
+        col = rainbow(n=3),
+        ylab = "Atık türleri",
+        xlab = "Atık miktarları",
+        ylim = c(0,3E+6),
+        horizontal = T)
+```
+
+```{r}
+ggplot(atik, aes(x=tehlikeli_atik, y=bolgeler))+
+  geom_boxplot(aes(fill = bolgeler))+
+  labs(title = "Bölgelere Göre Tehlikeli Atık Miktarlarının Kutu Grafiği", 
+       x = "Tehlikeli atık", y="Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")+
+  scale_x_log10()
+```
+
+```{r}
+ggplot(atik, aes(x=tehlikesiz_atik, y=bolgeler))+
+  geom_boxplot(aes(fill = bolgeler))+
+  labs(title = "Bölgelere Göre Tehlikesiz Atık Miktarlarının Kutu Grafiği", 
+       x = "Tehlikeli atık", y="Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")+
+  scale_x_log10()
+```
+
+```{r}
+corr1<-round(cor(atik[,2:3]),1)
+ggcorrplot(corr1, hc.order = TRUE,
+           type = "lower", outline.color = "#828282",
+           ggtheme = ggplot2::theme_minimal(),
+           lab = TRUE,
+           title = ("Atıkların Korelasyon Matrisi"))
+```
+
+```{r}
+ggplot(atik, aes(x=tehlikeli_atik, y=tehlikesiz_atik, color = bolgeler))+
+  geom_point(aes(color = bolgeler))+
+  labs(title = "Tehlikeli Atık - Tıbbi Atık", x = "Tehlikeli atık", y="Tehlikesiz atık")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))+
+  scale_x_log10()+scale_y_log10()
+```
+
+```{r}
+ax1<-atik %>% filter(tehlikeli_atik>=mean(tehlikeli_atik))
+ax2<-atik %>% filter(tehlikesiz_atik>=mean(tehlikesiz_atik))
+```
+
+```{r}
+ggplot(ax1, aes(y=sehir, x=tehlikeli_atik))+
+  geom_bar(aes(fill=bolgeler, y=reorder(sehir, tehlikeli_atik, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Tehlikeli Atık Ortalamasını Aşan Şehirler",
+       x ="Tehlikeli atık (ton)", y = "Şehirler", fill = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))+
+  scale_fill_discrete(name = "Bölgeler", 
+                      labels = c("Akdeniz","Doğu","Ege","İç Anadolu", "Marmara"))
+
+```
+
+```{r}
+ggplot(ax2, aes(x=tehlikesiz_atik, y=sehir))+
+  geom_bar(aes(fill=bolgeler, y=reorder(sehir, tehlikesiz_atik, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Tehlikesiz Atık Ortalamasını Aşan Şehirler",
+       x ="Tehlikesiz atık (ton)", y = "Şehirler", fill = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))+
+   scale_fill_discrete(name = "Bölgeler", 
+                      labels = c("Akdeniz","Ege","İç Anadolu","Karadeniz", "Marmara"))
+```
+
+```{r}
+ax3<- atik %>% 
+  mutate(top_atik=tehlikeli_atik+tehlikesiz_atik)
+
+tao <- ax3 %>% filter(top_atik>=mean(top_atik))
+```
+
+```{r}
+ggplot(tao, aes(y=sehir, x=top_atik))+
+  geom_bar(aes(fill=bolgeler, y=reorder(sehir, top_atik, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Toplam Atık Ortalamasını Aşan Şehirler",
+       x ="Toplam atık (ton)", y = "Şehirler", fill = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))+
+   scale_fill_discrete(name = "Bölgeler", 
+                      labels = c("Akdeniz","Ege","İç Anadolu","Karadeniz", "Marmara"))
+```
+
+```{r}
+taob<-ax3 %>% group_by(bolgeler) %>% 
+  summarise(top=sum(top_atik))
+```
+
+```{r}
+ggplot(taob, aes(y=bolgeler, x=top))+
+  geom_bar(aes(fill=bolgeler, y=reorder(bolgeler, top, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Bölgelere Göre Toplam Atık",
+       x ="Toplam atık (ton)", y = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+#Toprak Kaybı 
+```{r}
+toprak <- read_excel("C:/Users/Casper/Desktop/DSM 5006 Kesifsel Veri Analizi ve Veri Görsellestirme/Ödev_1/cöllesme.xlsx")
+```
+
+```{r}
+head(toprak)
+```
+
+```{r}
+summary(toprak)
+```
+
+```{r}
+apply(toprak[,2:6], 2, sd)
+```
+
+```{r}
+boxplot(toprak[,2:6],
+        main = "Şiddetlerine göre toprak kaybı miktarı",
+        col = rainbow(n=5),
+        ylab = "Şiddetler",
+        xlab = "Toprak kaybı miktarı",
+        horizontal = T)
+```
+
+```{r}
+corr2<-round(cor(toprak[,2:6]),1)
+ggcorrplot(corr2, hc.order = TRUE,
+           type = "lower", outline.color = "#828282",
+           ggtheme = ggplot2::theme_minimal(),
+           lab = TRUE,
+           title = ("Toprak Kaybı Şiddetlerinin Korelasyon Matrisi"))
+```
+
+```{r}
+ggplot(toprak, aes(x=`Very Low`, y=Moderate, color = bolgeler))+
+  geom_point(aes(color = bolgeler))+
+  labs(title = "Çok hafif şiddetli - Normal şiddetli", x = "Çok hafif şiddetli", y="Normal şiddetli")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))
+```
+
+```{r}
+tx1<- toprak %>% 
+  mutate(top_toprak=Low+`Very Low`+Moderate+Severe+`Very Severe`)
+head(tx1)
+tx2 <- tx1 %>% group_by(bolgeler) %>% 
+  summarise(top_bol=sum(top_toprak))
+```
+
+```{r}
+ggplot(tx2, aes(y=bolgeler, x=top_bol))+
+  geom_bar(aes(fill=bolgeler, y=reorder(bolgeler, top_bol, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Bölgelere Göre Toplam Toprak Miktarı",
+       x ="Toprak kaybı miktarı", y = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+```{r}
+tx3<- toprak %>% 
+  mutate(top_toprak=Moderate+Severe+`Very Severe`)
+
+tx4<-tx3 %>% filter(top_toprak>=mean(top_toprak))
+```
+
+```{r}
+ggplot(tx4, aes(y=Sehir, x=top_toprak))+
+  geom_bar(aes(fill=bolgeler, y=reorder(Sehir, top_toprak, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Yılda Hetar Başına 20 tondan Fazla Toprak Kaybı Yaşayan En Riskli Şehirler",
+       x ="Toprak kaybı miktarı", y = "Şehirler", fill = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))+
+   scale_fill_discrete(name = "Bölgeler", 
+                      labels = c("Doğu","Ege","Güney Doğu","İç Anadolu","Karadeniz","Marmara"))
+```
+
+#Hava Kirliliği
+```{r}
+hava_kirliligi <- read_csv("C:/Users/Casper/Desktop/DSM 5006 Kesifsel Veri Analizi ve Veri Görsellestirme/Ödev_1/hava_kalitesi.csv", 
+                          col_types = cols(X1 = col_skip(), PM10 = col_number(), 
+                                           SO2 = col_number(), CO = col_number(), 
+                                           NO2 = col_number(), O3 = col_number()))
+
+```
+
+```{r}
+df<-na.omit(hava_kirliligi)
+corr3<-round(cor(df[,-1]),1)
+ggcorrplot(corr3, hc.order = TRUE,
+           type = "lower", outline.color = "#828282",
+           ggtheme = ggplot2::theme_minimal(),
+           lab = TRUE,
+           title = ("Hava Kirliliğine ait Orijinal Değişkenlerin Korelasyon Matrisi"))
+```
+
+```{r}
+library(funModeling)
+```
+
+```{r}
+sapply(hava_kirliligi, function(x) sum(is.na(x)))
+```
+
+```{r}
+hava_kirliligi[!complete.cases(hava_kirliligi),]
+```
+
+```{r}
+unique(unlist(lapply(hava_kirliligi, function(x) which(is.na(x)))))
+```
+
+```{r}
+kgo<-function(x) {sum(is.na(x))/length(x)*100}
+apply(hava_kirliligi, 2, kgo)
+```
+
+```{r}
+library(imputeTS)
+library(mice)
+library(VIM)
+```
+
+```{r}
+aggr(hava_kirliligi, col=c("dodgerblue", "orange"),
+     numbers=TRUE, sortVars=TRUE, labels=names(hava_kirliligi),
+     cex.axis=0.7, gap=3,
+     ylab=c("Kayıp değer histogramı", "örüntü"))
+```
+
+Kayıp değer atama tahminsel ortalama eşleştirmesi
+```{r}
+set.seed(2882)
+dfpmm<-mice(hava_kirliligi, m=5, meth="pmm", maxit = 10)
+```
+
+```{r}
+set.seed(2882)
+df_pmm<-complete(dfpmm)
+summary(df_pmm)
+```
+
+```{r}
+corr4<-round(cor(df_pmm[,-1]),1)
+ggcorrplot(corr4, hc.order = TRUE,
+           type = "lower", outline.color = "#828282",
+           ggtheme = ggplot2::theme_minimal(),
+           lab = TRUE,
+           title = ("Hava Kirliliğine ait Pmm ile Elde Edilen Değişkenlerin Korelasyon Matrisi"))
+```
+
+Kayıp değer atama rassal orman
+```{r}
+set.seed(2882)
+dfrf<-mice(hava_kirliligi, m=5, meth="rf", maxit = 10)
+```
+
+```{r}
+set.seed(2882)
+df_rf<-complete(dfrf)
+summary(df_rf)
+```
+
+```{r}
+corr5<-round(cor(df_rf[,-1]),1)
+ggcorrplot(corr5, hc.order = TRUE,
+           type = "lower", outline.color = "#828282",
+           ggtheme = ggplot2::theme_minimal(),
+           lab = TRUE,
+           title = ("Hava Kirliliğine ait Rf ile Elde Edilen Değişkenlerin Korelasyon Matrisi"))
+```
+
+```{r}
+par(mfrow=c(1,3))
+corrplot::corrplot(corr3, method = "number", type = "lower")
+corrplot::corrplot(corr4, method = "number", type = "lower")
+corrplot::corrplot(corr5, method = "number", type = "lower")
+```
+
+```{r}
+head(df_rf)
+```
+
+```{r}
+summary(df_rf)
+```
+
+```{r}
+apply(df_rf[,-1], 2, sd)
+```
+
+```{r}
+boxplot(df_rf[,-1],
+        main = "Hava Kirliliğine ait Değişkenlerin Kutu Grafiği",
+        col = rainbow(n=5),
+        ylab = "Maddeler",
+        xlab = "Miktarları",
+        horizontal = T)
+```
+
+```{r}
+df_rf %>% summarise(
+  PM10_min=min(PM10),
+  PM10_ort=mean(PM10),
+  PM10_max=max(PM10),
+  PM10_sd=sd(PM10)
+)
+```
+
+```{r}
+sum(df_rf$PM10<=20)
+```
+
+```{r}
+hx1<- df_rf %>% filter(PM10<=20)
+```
+
+```{r}
+ggplot(hx1, aes(x=Şehir, y=PM10))+
+  geom_bar(aes(fill=Şehir), stat = "identity")+
+  labs(title = "Partikül Madde Ortalamasını 20 mg/m^3 Altında Kalan Şehirler",
+       y ="PM10 miktarı", x = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+
+```
+
+```{r}
+hx12<- df_rf %>% filter(PM10>=(mean(PM10)))
+```
+
+```{r}
+ggplot(hx12, aes(y=Şehir, x=PM10))+
+  geom_bar(aes(fill=Şehir, y=reorder(Şehir, PM10, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Atmosferik Partikül Madde Ortalamasını Aşan Şehirler",
+       x ="PM10 miktarı", y = "Şehirler", fill = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+        
+
+```
+
+```{r}
+df_rf %>% summarise(
+  SO2_min=min(SO2),
+  SO2_ort=mean(SO2),
+  SO2_max=max(SO2),
+  SO2_sd=sd(SO2)
+)
+```
+
+```{r}
+sum(df_rf$SO2<=50)
+```
+
+```{r}
+hx2<-df_rf %>% filter(SO2>=50)
+```
+
+```{r}
+ggplot(hx2, aes(x=Şehir, y=SO2))+
+  geom_bar(aes(fill=Şehir, y=reorder(SO2, Şehir)),
+           stat = "identity")+
+  labs(title = "Kükürt dioksit Kriterini Aşan Şehirler",
+       y ="SO2 miktarı", x = "Şehirler", fill = "Bölgeler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+```{r}
+df_rf %>% summarise(
+  CO_min=min(CO),
+  CO_ort=mean(CO),
+  CO_max=max(CO),
+  CO_sd=sd(CO)
+)
+```
+
+```{r}
+hx3<-df_rf %>% filter(CO>=mean(CO))
+```
+
+```{r}
+ggplot(hx3, aes(y=Şehir, x=CO))+
+  geom_bar(aes(fill=Şehir, y=reorder(Şehir, CO, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Karbon monoksit Ortalamasını Aşan Şehirler",
+       x ="CO miktarı", y = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+```{r}
+df_rf %>% summarise(
+  NO2_min=min(NO2),
+  NO2_ort=mean(NO2),
+  NO2_max=max(NO2),
+  NO2_sd=sd(NO2)
+)
+```
+
+```{r}
+sum(df_rf$NO2<=30)
+```
+
+```{r}
+hx4<- df_rf %>% filter(NO2<=30)
+```
+
+```{r}
+ggplot(hx4, aes(y=Şehir, x=NO2))+
+  geom_bar(aes(fill=Şehir, y=reorder(Şehir, NO2, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Azotdioksit Değerinin 30 mg/m3 Altında Kalan Şehirler",
+       x ="NO2 miktarı", y = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+```{r}
+hx41<-df_rf %>% filter(NO2>=30)
+```
+
+```{r}
+ggplot(hx41, aes(y=Şehir, x=NO2))+
+  geom_bar(aes(fill=Şehir, y=reorder(Şehir, NO2, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Azotdioksit Kriterini Aşan Şehirler",
+       x ="NO2 miktarı", y = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+```{r}
+df_rf %>% summarise(
+  O3_min=min(O3),
+  O3_ort=mean(O3),
+  O3_max=max(O3),
+  O3_sd=sd(O3)
+)
+```
+
+```{r}
+hx5<-df_rf %>% filter(O3>=mean(O3))
+```
+
+```{r}
+ggplot(hx5, aes(y=Şehir, x=O3))+
+  geom_bar(aes(fill=Şehir, y=reorder(Şehir, O3, FUN = mean)),
+           stat = "identity")+
+  labs(title = "Ozon gazı Ortalamasını Aşan Şehirler",
+       x ="O3 miktarı", y = "Şehirler")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.position = "none")
+```
+
+#Hakkari
+```{r}
+hakkari <- read_excel("C:/Users/Casper/Desktop/DSM 5006 Kesifsel Veri Analizi ve Veri Görsellestirme/Ödev_1/hakkari.xlsx", 
+                      col_types = c("date", "numeric", "numeric"))
+str(hakkari)
+```
+
+```{r}
+sapply(hakkari, function(x) sum(is.na(x)))
+```
+```{r}
+aggr(hakkari, col=c("dodgerblue", "orange"),
+     numbers=TRUE, sortVars=TRUE, labels=names(hakkari),
+     cex.axis=0.7, gap=3,
+     ylab=c("Kayıp değer histogramı", "örüntü"))
+```
+
+```{r}
+dhk<-na.omit(hakkari)
+corr6<-round(cor(dhk[,-1]),1)
+ggcorrplot(corr6, hc.order = TRUE,
+           type = "lower", outline.color = "#828282",
+           ggtheme = ggplot2::theme_minimal(),
+           lab = TRUE,
+           title = ("Hakkari'ye ait PM10 ve SO2 Değişkenlerinin Korelasyon Matrisi"))
+
+```
+
+```{r}
+set.seed(2882)
+dfhk<-mice(hakkari, m=5, meth="rf", maxit = 10)
+```
+
+```{r}
+set.seed(2882)
+df_hk<-complete(dfhk)
+summary(df_hk)
+```
+
+```{r}
+corr7<-round(cor(df_hk[,-1]),1)
+ggcorrplot(corr7, hc.order = TRUE,
+           type = "lower", outline.color = "#828282",
+           ggtheme = ggplot2::theme_minimal(),
+           lab = TRUE,
+           title = ("Atıkların Korelasyon Matrisi"))
+```
+
+```{r}
+head(df_hk)
+```
+
+```{r}
+summary(df_hk)
+```
+
+```{r}
+apply(df_hk[,-1], 2, sd)
+```
+
+```{r}
+boxplot(df_hk[,-1],
+        main = "Hakkari'ye ait Değişkenlerin Kutu Grafiği",
+        col = rainbow(n=2),
+        ylab = "Maddeler",
+        xlab = "Miktarları",
+        horizontal = T)
+```
+
+```{r}
+ggplot(df_hk, aes(x=PM10, y=SO2))+
+  geom_point(color="#00AFBB", shape=22)+
+  theme_minimal()
+```
+
+```{r}
+ggplot(df_hk, aes(x=PM10, y=SO2))+
+  geom_point(color="#00AFBB")+
+  geom_density_2d(color="#E89521")+
+  scale_x_log10()+
+  scale_y_log10()
+```
+
+```{r}
+ggplot(df_hk, aes(x=Tarih, y=PM10))+
+  geom_area(fill = "#00AFBB", color = "#E89521")
+```
+
+```{r}
+ggplot(df_hk, aes(x=Tarih, y=PM10))+
+  geom_line(color="#E46785")+
+  scale_x_datetime()+
+  theme(panel.background = element_rect(fill = "#BFD5E3", colour = "#6D9EC1",
+                                        size = 2, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                        colour = "white"),
+        panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
+                                        colour = "white"))+
+  labs(title = "Partikül maddenin zamana göre dağılımı",
+       x ="Tarih", y = "PM10")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"))
+```
+
+```{r}
+ggplot(df_hk, aes(x=Tarih, y=SO2))+
+  geom_area(fill = "#00AFBB", color = "#E89521")
+```
+
+```{r}
+ggplot(df_hk, aes(x=Tarih, y=SO2))+
+  geom_line(color="#E46785")+
+  scale_x_datetime()+
+  theme(panel.background = element_rect(fill = "#BFD5E3", colour = "#6D9EC1",
+                                        size = 2, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                        colour = "white"),
+        panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
+                                        colour = "white"))+
+   labs(title = "Kükürtdioksitin zamana göre dağılımı",
+       x ="Tarih", y = "SO2")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"))
+```
+
+PM10 Zaman serisi
+```{r}
+library(forecast)
+library(tseries)
+library(fpp2)
+library(lmtest)
+```
+
+```{r}
+df_pts<-ts(data = df_hk[,2],
+       start = c(2017, 01, 01),
+       end = c(2021, 05, 13),
+       frequency = 12)
+```
+
+```{r}
+df_pts
+```
+
+```{r}
+autoplot(df_pts)+
+  ggtitle("PM10 aylara göre değişimi")+
+  xlab("Aylar")+
+  ylab("PM10 ~ SO2")+
+  geom_line()+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))
+```
+
+```{r}
+df_decomp<-decompose(df_pts)
+df_decomp$seasonal
+df_decomp$trend
+df_decomp$random
+```
+
+```{r}
+plot(df_decomp, xlab="Aylar")
+```
+
+```{r}
+ggAcf(df_pts, lag.max = 100)+
+  ggtitle("Otokorelasyon Grafiği")
+```
+
+```{r}
+ggPacf(df_pts, lag.max = 100)+
+  ggtitle("Kısmi Otokorelasyon Grafiği")
+```
+
+```{r}
+df_diff1<-diff(df_pts, differences = 1)
+par(mfrow=c(1,2))
+plot.ts(df_pts, main = "Orijinal değerler")
+plot.ts(df_diff1, main = "1. dereceden fark alınmış değerler ")
+```
+
+```{r}
+ggAcf(df_diff1, lag.max = 100)+
+  ggtitle("Otokorelasyon Grafiği")
+```
+
+```{r}
+ggPacf(df_diff1, lag.max = 100)+
+  ggtitle("Kısmi Otokorelasyon Grafiği")
+```
+
+adf.test ve pp.test için:
+– H_0: Seri durağan değildir.
+– H_1: Seri durağandır.
+
+```{r}
+adf.test(df_pts)
+adf.test(df_diff1)
+```
+
+```{r}
+pp.test(df_pts)
+pp.test(df_diff1)
+```
+
+kpss.test için:
+– H_0: Seri durağandır.
+– H_1: Seri durağan değildir.
+```{r}
+kpss.test(df_pts, null = "Trend")
+kpss.test(df_diff1, null = "Trend")
+```
+
+```{r}
+(ari1<-arima(df_pts, order = c(1,1,0)))
+coeftest(ari1)
+```
+
+```{r}
+(ari2<-arima(df_pts, order = c(2,1,0)))
+coeftest(ari2)
+```
+
+```{r}
+(ari3<-arima(df_pts, order = c(3,1,0)))
+coeftest(ari3)
+```
+
+```{r}
+(ima1<-arima(df_pts, order = c(0,1,1)))
+coeftest(ima1)
+```
+
+```{r}
+(ima2<-arima(df_pts, order = c(0,1,2)))
+coeftest(ima2)
+```
+
+```{r}
+(ima3<-arima(df_pts, order = c(0,1,3)))
+coeftest(ima3)
+```
+
+```{r}
+(arima111<-arima(df_pts, order = c(1,1,1)))
+coeftest(arima111)
+```
+
+```{r}
+(arima112<-arima(df_pts, order = c(1,1,2)))
+coeftest(arima112)
+```
+
+```{r}
+(arima113<-arima(df_pts, order = c(1,1,3)))
+coeftest(arima113)
+```
+
+```{r}
+(arima211<-arima(df_pts, order = c(2,1,1)))
+coeftest(arima211)
+```
+
+```{r}
+(arima212<-arima(df_pts, order = c(2,1,2)))
+coeftest(arima212)
+```
+
+```{r}
+(arima213<-arima(df_pts, order = c(2,1,3)))
+coeftest(arima213)
+```
+
+```{r}
+(arima311<-arima(df_pts, order = c(3,1,1)))
+coeftest(arima311)
+```
+
+```{r}
+(arima312<-arima(df_pts, order = c(3,1,2)))
+coeftest(arima312)
+```
+
+```{r}
+(arima313<-arima(df_pts, order = c(3,1,3)))
+coeftest(arima313)
+```
+
+```{r}
+sse<-rbind(ari1$sigma2, ari2$sigma2, ari3$sigma2, 
+           ima1$sigma2, ima2$sigma2, ima3$sigma2,
+           arima111$sigma2, arima112$sigma2, arima113$sigma2,
+           arima211$sigma2, arima212$sigma2, arima213$sigma2,
+           arima311$sigma2, arima312$sigma2, arima313$sigma2)
+
+logl<-rbind(ari1$loglik, ari2$loglik, ari3$loglik, 
+            ima1$loglik, ima2$loglik, ima3$loglik,
+            arima111$loglik, arima112$loglik, arima113$loglik,
+            arima211$loglik, arima212$loglik, arima213$loglik,
+            arima311$loglik, arima312$loglik, arima313$loglik)
+
+aic<-rbind(ari1$aic, ari2$aic, ari3$aic,
+           ima1$aic, ima2$aic, ima3$aic,
+           arima111$aic, arima112$aic, arima113$aic,
+           arima211$aic, arima212$aic, arima213$aic,
+           arima311$aic, arima312$aic, arima313$aic)
+
+bic<-rbind(BIC(ari1), BIC(ari2), BIC(ari3),
+           BIC(ima1), BIC(ima2), BIC(ima3),
+           BIC(arima111), BIC(arima112), BIC(arima113),
+           BIC(arima211), BIC(arima212), BIC(arima213),
+           BIC(arima311), BIC(arima312), BIC(arima313))
+
+
+ic<-cbind(sse, logl, aic, bic)
+
+row.names(ic)<-c("(1,1,0)","(2,1,0)","(3,1,0)",
+                 "(0,1,1)","(0,1,2)","(0,1,3)",
+                 "(1,1,1)","(1,1,2)","(1,1,3)",
+                 "(2,1,1)","(2,1,2)","(2,1,3",
+                 "(3,1,1)","(3,1,2)","(3,1,3")
+
+colnames(ic)<-c("SSE", "LogLikelihood", "AIC", "BIC")
+
+view(ic)
+```
+
+Tanısal Kontrol
+```{r}
+arima213
+```
+
+```{r}
+coeftest(arima213)
+```
+
+```{r}
+par(mfrow=c(1,2))
+hist(arima213$residuals, main = "Artıkların histogram grafiği", xlab = "ARIMA(2,1,2) modeline ait artıklar")
+qqnorm(arima213$residuals)
+```
+
+H_0: Artıklar normal dağılır.
+H_1: artıklar normal dağılmaz.
+```{r}
+shapiro.test(arima213$residuals)
+```
+
+```{r}
+checkresiduals(arima213$residuals)
+```
+
+```{r}
+tsdiag(arima213)
+```
+
+Box-Pierce (ve ya Ljung–Box) testi;
+H_0: Artıkların otokorelasyonu yoktur.
+H_1: Artıkların otokorelasyonu vardır.
+
+```{r}
+Box.test(arima213$residuals, lag = 1)
+Box.test(arima213$residuals, lag = 6)
+Box.test(arima213$residuals, lag = 12)
+Box.test(arima213$residuals, lag = 24)
+Box.test(arima213$residuals, lag = 48)
+```
+
+```{r}
+Box.test(arima213$residuals, lag = 1, type = c("Ljung-Box"))
+Box.test(arima213$residuals, lag = 6, type = c("Ljung-Box"))
+Box.test(arima213$residuals, lag = 12, type = c("Ljung-Box"))
+Box.test(arima213$residuals, lag = 24, type = c("Ljung-Box"))
+Box.test(arima212$residuals, lag = 48, type = c("Ljung-Box"))
+```
+
+Öngörümleme 
+```{r}
+forecast(arima213, h=12)
+```
+
+```{r}
+plot(forecast(arima213, h=12))
+```
+
+```{r}
+predict(arima213, n.ahead = 12)
+```
+
+```{r}
+(arima212_acc<-accuracy(forecast(arima213, h=12)))
+```
+
+SO2 zaman serisi analizi
+```{r}
+df_sts<-ts(data = df_hk[,3],
+       start = c(2017, 01, 01),
+       end = c(2021, 05, 13),
+       frequency = 12)
+```
+
+```{r}
+df_sts
+```
+
+```{r}
+autoplot(df_sts)+
+  ggtitle("SO2PM10 aylara göre değişimi")+
+  xlab("Aylar")+
+  theme(plot.title = element_text(color = "#828282", size = 12, face = "bold"),
+        axis.title.x = element_text(color = "darkgrey", size = 10, face = "bold"),
+        axis.title.y = element_text(color = "darkgrey", size = 10, face = "bold"),
+        legend.title = element_text(color = "#828282", size = 10, face = "bold"),
+        legend.background = element_rect(fill = "lightyellow"))
+```
+
+```{r}
+df_decomp<-decompose(df_sts)
+df_decomp$seasonal
+df_decomp$trend
+df_decomp$random
+```
+
+```{r}
+plot(df_decomp, xlab="Aylar")
+```
+
+```{r}
+ggAcf(df_sts, lag.max = 100)+
+  ggtitle("Otokorelasyon Grafiği")
+```
+
+```{r}
+ggPacf(df_sts, lag.max = 100)+
+  ggtitle("Kısmi Otokorelasyon Grafiği")
+```
+
+```{r}
+df_diff1<-diff(df_sts, differences = 1)
+par(mfrow=c(1,2))
+plot.ts(df_sts, main = "Orijinal değerler")
+plot.ts(df_diff1, main = "1. dereceden fark alınmış değerler ")
+```
+
+```{r}
+ggAcf(df_diff1, lag.max = 100)+
+  ggtitle("Otokorelasyon Grafiği")
+```
+
+```{r}
+ggPacf(df_diff1, lag.max = 100)+
+  ggtitle("Kısmi Otokorelasyon Grafiği")
+```
+
+adf.test ve pp.test için:
+– H_0: Seri durağan değildir.
+– H_1: Seri durağandır.
+```{r}
+adf.test(df_pts)
+adf.test(df_diff1)
+```
+
+```{r}
+pp.test(df_pts)
+pp.test(df_diff1)
+```
+
+kpss.test için:
+– H_0: Seri durağandır.
+– H_1: Seri durağan değildir.
+```{r}
+kpss.test(df_pts, null = "Trend")
+kpss.test(df_diff1, null = "Trend")
+```
+
+```{r}
+(ari1<-arima(df_sts, order = c(1,1,0)))
+coeftest(ari1)
+```
+
+```{r}
+(ari2<-arima(df_sts, order = c(2,1,0)))
+coeftest(ari2)
+```
+
+```{r}
+(ari3<-arima(df_sts, order = c(3,1,0)))
+coeftest(ari3)
+```
+
+```{r}
+(ima1<-arima(df_sts, order = c(0,1,1)))
+coeftest(ima1)
+```
+
+```{r}
+(ima2<-arima(df_sts, order = c(0,1,2)))
+coeftest(ima2)
+```
+
+```{r}
+(ima3<-arima(df_sts, order = c(0,1,3)))
+coeftest(ima3)
+```
+
+```{r}
+(arima111<-arima(df_sts, order = c(1,1,1)))
+coeftest(arima111)
+```
+
+```{r}
+(arima112<-arima(df_sts, order = c(1,1,2)))
+coeftest(arima112)
+```
+
+```{r}
+(arima113<-arima(df_sts, order = c(1,1,3)))
+coeftest(arima113)
+```
+
+```{r}
+(arima211<-arima(df_sts, order = c(2,1,1)))
+coeftest(arima211)
+```
+
+```{r}
+(arima212<-arima(df_sts, order = c(2,1,2)))
+coeftest(arima212)
+```
+
+```{r}
+(arima213<-arima(df_sts, order = c(2,1,3)))
+coeftest(arima213)
+```
+
+```{r}
+(arima311<-arima(df_sts, order = c(3,1,1)))
+coeftest(arima311)
+```
+
+```{r}
+(arima312<-arima(df_sts, order = c(3,1,2)))
+coeftest(arima312)
+```
+
+```{r}
+(arima313<-arima(df_sts, order = c(3,1,3)))
+coeftest(arima313)
+```
+
+```{r}
+sse<-rbind(ari1$sigma2, ari2$sigma2, ari3$sigma2, 
+           ima1$sigma2, ima2$sigma2, ima3$sigma2,
+           arima111$sigma2, arima112$sigma2, arima113$sigma2,
+           arima211$sigma2, arima212$sigma2, arima213$sigma2,
+           arima311$sigma2, arima312$sigma2, arima313$sigma2)
+
+logl<-rbind(ari1$loglik, ari2$loglik, ari3$loglik, 
+            ima1$loglik, ima2$loglik, ima3$loglik,
+            arima111$loglik, arima112$loglik, arima113$loglik,
+            arima211$loglik, arima212$loglik, arima213$loglik,
+            arima311$loglik, arima312$loglik, arima313$loglik)
+
+aic<-rbind(ari1$aic, ari2$aic, ari3$aic,
+           ima1$aic, ima2$aic, ima3$aic,
+           arima111$aic, arima112$aic, arima113$aic,
+           arima211$aic, arima212$aic, arima213$aic,
+           arima311$aic, arima312$aic, arima313$aic)
+
+bic<-rbind(BIC(ari1), BIC(ari2), BIC(ari3),
+           BIC(ima1), BIC(ima2), BIC(ima3),
+           BIC(arima111), BIC(arima112), BIC(arima113),
+           BIC(arima211), BIC(arima212), BIC(arima213),
+           BIC(arima311), BIC(arima312), BIC(arima313))
+
+
+ic<-cbind(sse, logl, aic, bic)
+
+row.names(ic)<-c("(1,1,0)","(2,1,0)","(3,1,0)",
+                 "(0,1,1)","(0,1,2)","(0,1,3)",
+                 "(1,1,1)","(1,1,2)","(1,1,3)",
+                 "(2,1,1)","(2,1,2)","(2,1,3",
+                 "(3,1,1)","(3,1,2)","(3,1,3")
+
+colnames(ic)<-c("SSE", "LogLikelihood", "AIC", "BIC")
+
+view(ic)
+```
+
+```{r}
+auto.arima(df_sts,
+           d=1,
+           ic = c("aicc", "aic", "bic"),
+           test = c("kpss", "adf", "pp"))
+```
+
+Tanısal Kontrol
+```{r}
+arima212
+```
+
+```{r}
+coeftest(arima212)
+```
+
+```{r}
+par(mfrow=c(1,2))
+hist(arima212$residuals, main = "Artıkların histogram grafiği", xlab = "ARIMA(2,1,2) modeline ait artıklar")
+qqnorm(arima212$residuals)
+```
+-Grafiğe baktığımızda artıkların normal dağıldığı görülmektedir yinede test edilmelidir.
+
+H_0: Artıklar normal dağılır.
+H_1: artıklar normal dağılmaz.
+```{r}
+shapiro.test(arima212$residuals)
+```
+
+```{r}
+checkresiduals(arima212$residuals)
+```
+
+```{r}
+tsdiag(arima212)
+```
+
+Box-Pierce (ve ya Ljung–Box) testi;
+H_0: Artıkların otokorelasyonu yoktur.
+H_1: Artıkların otokorelasyonu vardır.
+
+```{r}
+Box.test(arima212$residuals, lag = 1)
+Box.test(arima212$residuals, lag = 6)
+Box.test(arima212$residuals, lag = 12)
+Box.test(arima212$residuals, lag = 24)
+Box.test(arima212$residuals, lag = 48)
+```
+
+```{r}
+Box.test(arima212$residuals, lag = 1, type = c("Ljung-Box"))
+Box.test(arima212$residuals, lag = 6, type = c("Ljung-Box"))
+Box.test(arima212$residuals, lag = 12, type = c("Ljung-Box"))
+Box.test(arima212$residuals, lag = 24, type = c("Ljung-Box"))
+Box.test(arima212$residuals, lag = 48, type = c("Ljung-Box"))
+```
+
+Öngörümleme 
+```{r}
+forecast(arima212, h=12)
+```
+
+```{r}
+plot(forecast(arima212, h=12))
+```
+
+```{r}
+predict(arima212, n.ahead = 12)
+```
+
+```{r}
+(arima212_acc<-accuracy(forecast(arima212, h=12)))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
